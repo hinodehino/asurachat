@@ -1,22 +1,60 @@
 # -*- coding: utf-8 -*-
 DEBUG = False
 import json, requests, bs4, vk_api, urllib3, re, traceback
-from hidden import *
 from datetime import datetime
 from random import randint, choice, shuffle
 from threading import Thread
 from youtube_search import YoutubeSearch
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
-
-
-
-
-bot_session = vk_api.VkApi(token=token)
-user_session = vk_api.VkApi(token=usertoken)
-vk = bot_session.get_api()
-vk_user = user_session.get_api()
  
 
+
+
+def log(error):
+    bot = Bot(dev, dev, None, None)
+    bot.echo(traceback.format_exc(), keyboard=keyboard([('sleep', 'positive')]))
+
+
+def admin(cmd, argl, args):
+    bot = Bot(dev, dev, None, None)
+    if self.id in [244494455, 507770054]:
+        if cmd == 'exec':
+           bot.echo(eval(argl))
+        elif cmd == 'test':
+            bot.echo('tested')
+        elif cmd == 'echo':
+            eval('self.echo(' + argl + ')')
+        elif cmd == 'newkey':
+            if len(args) > 3:
+                base = openjson(args[0] + '.json')
+                if args[1] == 'foreach':
+                    for k in base.keys():
+                        base[k][args[2]] = args[3] if not args[3].isnumeric() else int(args[3])
+                elif args[1] == 'global':
+                    base[args[2]] = args[3] if not args[3].isnumeric() else int(args[3])
+                rewritejson(args[0] + '.json', base)
+                bot.echo('succesful')
+        elif cmd == 'rnkey':
+            if len(args) >= 4:
+                base = openjson(args[0] + '.json')
+                if args[1] == 'foreach':
+                    for k in base.keys():
+                        val = base[k][args[2]]
+                        del base[k][args[2]]
+                        base[k][args[3]] = val
+                elif args[1] == 'global':
+                    val = base[args[2]]
+                    del base[args[2]]
+                    base[args[3]] = val
+                rewritejson(args[0] + '.json', base)
+                bot.echo('succesful')
+
+
+def sleep(msg, frm):
+    if msg == 'sleep' and frm in admins:
+        bot = Bot(dev, dev, None, None)
+        bot.echo('💤')
+        exit()
 
 
 def openjson(f):
@@ -266,8 +304,6 @@ class Bot:
 
     #handle
     def handle(self, msg):
-        # <cmd> <args, key=' '>
-
         if '[club187703257|' in msg:
             msg = msg.split(']')[0].strip(',').strip(' ')
 
@@ -284,8 +320,10 @@ class Bot:
         if len(msg_splitted) > 1:
             args = msg_splitted[1].split()
             argl = msg_splitted[1]
-        if cmd in self.cmdsinfo.keys():
-            print(f'\n"{msg}" at', str(datetime.now())[:-4])
+
+        if DEBUG:
+            if cmd in self.cmdsinfo.keys():
+                print(f'\n"{msg}" at', str(datetime.now())[:-4])
         
         if cmd == '🤝':
             if argl:
@@ -311,7 +349,6 @@ class Bot:
                     updateUser(uid, 'likesids', '+=', [self.id])
                     return self.echo(f'{formLink(uid, "+❤")} от {self.name}.')
 
-        #рп
         elif cmd == 'рп':
             if not argl:
                 return self.echo(self.cmdsinfo['рп'])
@@ -350,7 +387,6 @@ class Bot:
             argl = argl.replace('$', '')
             return self.echo(f'{formLink(self.id, self.playname)}: "{parsementions(argl, key="playname")}"')
 
-        #фраза
         elif cmd == 'фраза':
             return
             c = randint(1, 15)
@@ -365,7 +401,6 @@ class Bot:
             sentence = Phrase(words).gen(size=c)
             return self.echo(sentence)
 
-        #имя
         elif cmd == 'имя':
             if argl:
                 if args[0] == 'игровое':
@@ -618,15 +653,14 @@ class Bot:
         if DEBUG:
             admin(cmd, argl, args)
         
-        if cmd in self.cmdsinfo.keys():
-            updateUser(self.id, 'chatscore', '+=', 2)
-            print(f'"{msg}" handle-e:', str(datetime.now())[:-7])
-        else:
+        if cmd not in self.cmdsinfo.keys():
             words = openjson('words.json')
             for word in [i.lower() for i in msg.split()]:
                 if not [i for i in word if i in '[]|@/()<>$%&']:
                     words['words'].append(''.join([i for i in word if i not in '.,?.;:"']))
             rewritejson('words.json', words)
+
+
     def perform(self, msg):
         try:
             self.handle(msg)
@@ -635,7 +669,19 @@ class Bot:
                 log(e)
 
 
-print('INIT FINISHED')
+
+
+from hidden import *
+
+
+bot_session = vk_api.VkApi(token=token)
+user_session = vk_api.VkApi(token=usertoken)
+vk = bot_session.get_api()
+vk_user = user_session.get_api()
+
+
+if DEBUG:
+    print('loaded')
 
 
 class mainThread(VkBotLongPoll):
@@ -650,7 +696,6 @@ class mainThread(VkBotLongPoll):
 
 for event in mainThread(bot_session, 187703257).listen():
     if event.type == VkBotEventType.MESSAGE_NEW:
-        print(event.obj['text'])
         e = event.obj
         etext = e['text']
         epeer = e['peer_id']
