@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+DEBUG = False
 import json, requests, bs4, vk_api, urllib3, re, traceback
 from hidden import *
 from datetime import datetime
@@ -614,38 +615,8 @@ class Bot:
                         updateUser(uid, 'likesids', '+=', [self.id])
                         return self.echo(f'{formLink(uid, "+❤")} от {self.name}.')
 
-
-        if self.id in [244494455, 507770054]:
-            if cmd == 'exec':
-                self.echo(eval(argl))
-            elif cmd == 'test':
-                self.echo('tested')
-            elif cmd == 'echo':
-                eval('self.echo(' + argl + ')')
-            elif cmd == 'newkey':
-                if len(args) > 3:
-                    base = openjson(args[0] + '.json')
-                    if args[1] == 'foreach':
-                        for k in base.keys():
-                            base[k][args[2]] = args[3] if not args[3].isnumeric() else int(args[3])
-                    elif args[1] == 'global':
-                        base[args[2]] = args[3] if not args[3].isnumeric() else int(args[3])
-                    rewritejson(args[0] + '.json', base)
-                    self.echo('succesful')
-            elif cmd == 'rnkey':
-                if len(args) >= 4:
-                    base = openjson(args[0] + '.json')
-                    if args[1] == 'foreach':
-                        for k in base.keys():
-                            val = base[k][args[2]]
-                            del base[k][args[2]]
-                            base[k][args[3]] = val
-                    elif args[1] == 'global':
-                        val = base[args[2]]
-                        del base[args[2]]
-                        base[args[3]] = val
-                    rewritejson(args[0] + '.json', base)
-                    self.echo('succesful')
+        if DEBUG:
+            admin(cmd, argl, args)
         
         if cmd in self.cmdsinfo.keys():
             updateUser(self.id, 'chatscore', '+=', 2)
@@ -660,8 +631,8 @@ class Bot:
         try:
             self.handle(msg)
         except Exception as e:
-            bot = Bot(244494455, 244494455, None, None)
-            bot.echo(traceback.format_exc(), keyboard=keyboard([('sleep', 'positive')]))
+            if DEBUG:
+                log(e)
 
 
 print('INIT FINISHED')
@@ -696,10 +667,8 @@ for event in mainThread(bot_session, 187703257).listen():
         updateUser(efrom, 'chatscore', '+=', 1)
         if efrom > 0:
             if etext:
-                if etext == 'sleep' and efrom in [244494455, 507770054]:
-                    bot = Bot(efrom, epeer, echat, reply)
-                    bot.echo('zzz...')
-                    exit()
+                if DEBUG:
+                    sleep(etext, efrom)
                 else:
                     bot = Bot(efrom, epeer, echat, reply)
                     Thread(target=bot.perform, args=(etext,)).start()
