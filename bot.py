@@ -15,15 +15,15 @@ def log(error):
     bot.echo(traceback.format_exc(), keyboard=keyboard([('sleep', 'positive')]))
 
 
-def admin(cmd, argl, args):
-    bot = Bot(dev, dev, None, None)
-    if self.id in [244494455, 507770054]:
+def admin(id_, cmd, argl, args):
+    if id_ in admins:
+        bot = Bot(dev, dev, None, None)
         if cmd == 'exec':
            bot.echo(eval(argl))
         elif cmd == 'test':
             bot.echo('tested')
         elif cmd == 'echo':
-            eval('self.echo(' + argl + ')')
+            eval('bot.echo(' + argl + ')')
         elif cmd == 'newkey':
             if len(args) > 3:
                 base = openjson(args[0] + '.json')
@@ -651,7 +651,7 @@ class Bot:
                         return self.echo(f'{formLink(uid, "+❤")} от {self.name}.')
 
         if DEBUG:
-            admin(cmd, argl, args)
+            admin(self.id, cmd, argl, args)
         
         if cmd not in self.cmdsinfo.keys():
             words = openjson('words.json')
@@ -714,6 +714,5 @@ for event in mainThread(bot_session, 187703257).listen():
             if etext:
                 if DEBUG:
                     sleep(etext, efrom)
-                else:
-                    bot = Bot(efrom, epeer, echat, reply)
-                    Thread(target=bot.perform, args=(etext,)).start()
+                bot = Bot(efrom, epeer, echat, reply)
+                Thread(target=bot.perform, args=(etext,)).start()
