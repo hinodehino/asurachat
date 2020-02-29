@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-DEBUG = False
+DEBUG = True
 import json, requests, bs4, vk_api, urllib3, re, traceback
 from datetime import datetime
 from random import randint, choice, shuffle
@@ -324,7 +324,7 @@ class Bot:
         if DEBUG:
             if cmd in self.cmdsinfo.keys():
                 print(f'\n"{msg}" at', str(datetime.now())[:-4])
-        
+        #4680C2
         if cmd == '🤝':
             if argl:
                 if ids(argl):
