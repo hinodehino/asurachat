@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 DEBUG = True
-import json, requests, bs4, vk_api, urllib3, re, traceback
+import json, requests, vk_api, urllib3, traceback, pymorphy2
+from hidden import *
 from datetime import datetime
 from random import randint, choice, shuffle
 from threading import Thread
@@ -177,7 +178,7 @@ def ids(m):
     return []
 
 
-def parsementions(s, key=None):
+def parsementions(s, callid, key=None):
     newstring = s
     names = {}
     m = s.replace('[', '$sep').replace(']', '$sep').replace('|', '$sep').split('$sep')
@@ -192,7 +193,10 @@ def parsementions(s, key=None):
         digitid = int(f[0][2:]) if f[0][:2] == 'id' else int('-' + f[0][4:])
         mention = getUser(digitid, key='mention')
         if key:
-            name = getUser(digitid, key=key)
+            if key == 'playname' and digitid == callid:
+                name = getUser(digitid, key='себя')
+            else:
+                name = getUser(digitid, key=key)
         else:
             name = getUser(digitid, key='name')
         if mention:
@@ -264,29 +268,13 @@ class Bot:
         self.user = getUser(self.id)
         self.playname = getNamel(self.id, key='playname')
         self.name = getNamel(self.id)
-        self.cmdsinfo = {
-            'помощь': '💭 помощь - FAQ.\n💭 помощь (команда) - информация о команде.',
-            'статус': '💭 статус - твой статус.\n💭 Можно посмотреть статус другого человека, ответив на его сообщение этой командой.',
-            'имя': '💭 имя (...) - изменяет твое имя в обычных сообщениях.\n💭 имя игровое (...) - изменяет твое имя в играх.\n💭 Также, если хочешь сбросить имя, отправь "имя (игровое) сбросить", или найди кнопку в своем статусе.',
-            'заметка': '💭 заметка (...) - меняет заметку в статусе.',
-            'пара': '💭 пара - ищет для тебя пару в беседе.\n💭 Можно найти пару другому человеку, ответив на его сообщение этой командой.',
-            'гиф': '💭 гиф (тег) (рандом от 1 до 100) - присылает гифку.',
-            'рп': '💭 рп (символ действия)(...) - отправляет текст в формате ролевой игры.\n💭 Если ты хочешь взаимодействовать с другом ролплеером, то ответь на его сообщение этой командой. (Ты): *(действие) (Игрок)*',
-            'фраза': '💭 фраза (кол-во слов) - попытается собрать из случайных слов фразу.',
-            'ютуб': '💭 ютуб (тег) - находит видео на ютубе.',
-            'магазин': '💭 магазин - открывает магазин.',
-            'инвентарь': '💭 инвентарь - открывает твой инвентарь.💭 Можно посмотреть инвентарь другого человека, ответив на его сообщение этой командой.',
-            'упоминание': '💭 упоминание (выкл/вкл) - отключает или включает @упоминание в чате. Очень поможет тем, кому не нравятся уведомления от бота.',
-        }
 
 
     #echo 
     def echo(self, *args, attach='', keyboard={}, peer=None, chat=None, sticker_id=0):
-        peer = self.peer if not peer else peer
-        chat = self.chat if not chat else chat
         if self.chat:
             vk.messages.send(
-                chat_id = chat,
+                chat_id = self.chat if not chat else chat,
                 message = ''.join(args) if all([True if str(i) == i else False for i in args]) else args,
                 attachment = attach,
                 keyboard = keyboard,
@@ -294,7 +282,7 @@ class Bot:
                 random_id = 0)   
         else:
             vk.messages.send(
-                peer_id = peer,
+                peer_id = self.peer if not peer else peer,
                 message = ''.join(args) if all([True if str(i) == i else False for i in args]) else args,
                 attachment = attach,
                 keyboard = keyboard,
@@ -307,12 +295,9 @@ class Bot:
         if '[club187703257|' in msg:
             msg = msg.split(']')[0].strip(',').strip(' ')
 
-        if msg == 'Сбросить все имена':
+        if msg == 'Сбросить имена':
             self.handle('имя сбросить')
-            self.handle('имя рп сбросить')
             self.handle('имя игровое сбросить')
-        elif ''.join(msg.split()).lower() in ['^^vv<><>ba', 'uuddlrlrba', 'upupdowndownleftrightleftrightba', 'вверхвверхвнизвнизвлевовправовлевовправоba']:
-            self.echo(attach='photo244494455_457253498')
 
         cmd, args, argl = '', [], ''
         msg_splitted = msg.split(' ', 1)
@@ -322,9 +307,9 @@ class Bot:
             argl = msg_splitted[1]
 
         if DEBUG:
-            if cmd in self.cmdsinfo.keys():
+            if cmd in cmds.keys():
                 print(f'\n"{msg}" at', str(datetime.now())[:-4])
-        #4680C2
+
         if cmd == '🤝':
             if argl:
                 if ids(argl):
@@ -351,7 +336,7 @@ class Bot:
 
         elif cmd == 'рп':
             if not argl:
-                return self.echo(self.cmdsinfo['рп'])
+                return self.echo(cmds['рп'])
             prefix = ''
             for s in argl:
                 if s in '"*/<[{(@#$%^&-=+_':
@@ -368,38 +353,23 @@ class Bot:
                     '<': '>'
                 }
                 affix = ''.join([pairs[s] if s in pairs.keys() else s for s in prefix[::-1]])
+            else:
+                argl = '"' + argl
+                affix = '"'
             uid = None
             if self.reply:
                 uid = self.reply['from_id']
-            if uid == self.id:
-                uname = self.playname
-            else:
-                uname = getNamel(uid, key='playname')
+            print(uid, self.id)
             if uid:
+                if uid == self.id:
+                    uname = formLink(self.id, 'себя')
+                else:
+                    uname = getNamel(uid, key='playname')
                 argl += f' {uname}{affix}'
             else:
                 argl += affix
-            parsed = parsementions(argl, key='playname')
-            return self.echo(f'{formLink(self.id, self.playname)}: {parsed}')
-            for s in argl:
-                if s in '"*/[{(@#$%^&-=+':
-                    argl = argl.replace(s, '$')
-            argl = argl.replace('$', '')
-            return self.echo(f'{formLink(self.id, self.playname)}: "{parsementions(argl, key="playname")}"')
-
-        elif cmd == 'фраза':
-            return
-            c = randint(1, 15)
-            if argl and argl.isnumeric():
-                if int(argl) > 15:
-                    return self.echo(f'✋ {self.name}, не более 15 слов.')
-                elif int(argl) <= 0:
-                    return self.echo(self.cmdsinfo['фраза'])
-                c = randint(1, int(argl))
-            words = open('words').read().split()
-            affixes = 'а но ведь чтобы что ибо так-как т.к. тк потому-что потомучто потому поэтому следовательно итак'
-            sentence = Phrase(words).gen(size=c)
-            return self.echo(sentence)
+            parsed = parsementions(argl, self.id, key='playname')
+            return self.echo(f'{self.playname}: {parsed}')
 
         elif cmd == 'имя':
             if argl:
@@ -407,43 +377,53 @@ class Bot:
                     names = {}
                     for k, v in openjson('users.json').items():
                         names[k] = v['playname']
-                    formtype = 'играх'
+                    formtype = 'игровое имя'
                     keytype = 'playname'
+                    if args[1] == 'сбросить':
+                        if str(self.id) in names:
+                            del names[str(self.id)]
+                        name = vk.users.get(user_ids=self.id)[0]['first_name']
+                        updateUser(self.id, keytype, '=', name)
+                        return self.echo(f'✅️ Ты сбросил своё {formtype} на {formLink(self.id, name)}.')
                 else:
                     names = {}
                     for k, v in openjson('users.json').items():
                         names[k] = v['name']
-                    formtype = 'обычных ответах'
+                    formtype = 'регулярное имя'
                     keytype = 'name'
-                if len(args[0]) > 1:
+                    if argl == 'сбросить':
+                        if str(self.id) in names:
+                            del names[str(self.id)]
+                        name = vk.users.get(user_ids=self.id)[0]['first_name']
+                        updateUser(self.id, keytype, '=', name)
+                        return self.echo(f'✅️ Ты сбросил своё {formtype} на {formLink(self.id, name)}.')
+                if len(args) > 1:
+                    name = argl.split(' ', 1)[1]
+                else:
+                    name = argl
+                busy = False
+                if keytype == 'playname':
                     busy = False
+                else:
                     for k, v in names.items():
-                        if v.lower() == argl.lower():
+                        if v.lower() == name.lower():
                             if k == str(self.id):
                                 busy = True
-                    if not busy:
-                        for s in argl:
-                            if s == 'сбросить':
-                                if str(self.id) in names:
-                                    del names[str(self.id)]
-                                name = vk.users.get(user_ids=self.id)[0]['first_name']
-                                updateUser(self.id, keytype, '=', name)
-                                return self.echo(f'✅️ Ты сбросил своё имя в {formtype} на {formLink(self.id, name)}.')
-                        admiss = checkSpelling(argl)
-                        if admiss:
-                            updateUser(self.id, keytype, '=', args[1])
-                            return self.echo(f'✅️ Ты изменил имя в {formtype} на {formLink()}.')
-                        else:
-                            return self.echo(f'✋ {self.name}, этот никнейм имеет некорректное написание.\n💭Напоминаю, что никнеймы состоят только из букв, цифр и пробелов и имеют длину не менее двух и не более 40 символов.')
+                if not busy:
+                    admiss = checkSpelling(argl)
+                    if admiss:
+                        updateUser(self.id, keytype, '=', name)
+                        return self.echo(f'✅️ Ты изменил своё {formtype} на {formLink(self.id, name)}.')
                     else:
-                        return self.echo(f'✋ {self.name}, попробуй другое имя, такое уже занято.\n💭 Если ты хочешь сбросить своё имя на свое настоящее, то набери в конце "сбросить".')
-                return self.echo(f'💭 {self.name}, в {formtype} я зову тебя {names[self.id]}.')
+                        return self.echo(f'{self.name}, этот никнейм имеет некорректное написание.\n💭Напоминаю, что никнеймы состоят только из букв, цифр и пробелов и имеют длину не менее двух и не более 40 символов.')
+                else:
+                    return self.echo(f'{self.name}, попробуй другое имя, такое уже занято.\n💭 Если ты хочешь сбросить своё имя на свое настоящее, то набери в конце "сбросить".')
 
         elif cmd == 'заметка':
             if not argl:
-                return self.echo(self.cmdsinfo['заметка'])
+                return self.echo(cmds['заметка'])
             if len(argl) > 120:
-                return self.echo(f'✋ {self.name}, заметка должна быть длинной не более 120 символов.')
+                return self.echo(f'{self.name}, заметка должна быть длинной не более 120 символов.')
             if argl == '-':
                 updateUser(self.id, 'tip', '=', '')
                 return self.echo(f'✅ {self.name}, ты сбросил свою заметку в статусе.')
@@ -486,7 +466,7 @@ class Bot:
         
         elif cmd == 'гиф':
             if not argl:
-                return self.echo(self.cmdsinfo['гиф'])
+                return self.echo(cmds['гиф'])
             c = None
             f = True
             if len(args) > 1:
@@ -505,17 +485,18 @@ class Bot:
                 if gif:
                     return self.echo(f'{formLink(self.id, "✅")}:', attach=(uploadfile(gif, self.peer)))
                 else:
-                    return self.echo(f'{self.name}, гифок по запросу "{argl}" не оказалось 😔')
-            return self.echo(self.cmdsinfo['гиф'])
+                    return self.echo(f'{self.name}, гифок по запросу "{argl}" не оказалось.')
+            return self.echo(cmds['гиф'])
 
         elif cmd == 'ютуб':
+            return self.echo('На данный момент команда "ютуб" пока не работает ;(')
             if not argl:
-                return self.echo(self.cmdsinfo['ютуб'])
+                return self.echo(cmds['ютуб'])
             else:
                 self.echo(f'🔍 {self.name}, ищу видео по твоему запросу...')
                 res = json.loads(YoutubeSearch(argl, max_results=10).to_json())['videos']
                 if not res:
-                    return self.echo(f'{self.name}, видео по запросу "{argl}" не оказалось 😔')
+                    return self.echo(f'{self.name}, видео по запросу "{argl}" не оказалось.')
                 else:
                     videodata = choice(res)
                     video = vk_user.video.save(name=videodata['title'], is_private=1, wallpost = 0, link=f'youtube.com{videodata["link"]}')
@@ -525,12 +506,12 @@ class Bot:
         elif cmd == 'статус':
             flag = 0
             uid = self.id
-            name = self.name
             if self.reply:
                 uid = self.reply['from_id']
             if uid == self.id:
                 flag = 1
             user = getUser(uid)
+            name = user['name']
             if uid > 0:
                 resp = vk.users.get(user_ids=uid, fields='screen_name')[0]
                 if 'screen_name' not in resp:
@@ -545,16 +526,13 @@ class Bot:
                     screenname = resp['screen_name']
             chatlvl = user['chatscore'] // 50
             gamelvl = user['gamescore'] // 10
-            if chatlvl > chatmaxlvl:
-                chatlvl = chatmaxlvl
-            if gamelvl > gamemaxlvl:
-                gamelvl = gamemaxlvl
-            chatrank = chatranks[chatlvl // 5 * 5]
-            gamerank = gameranks[gamelvl // 5 * 5]
+            chatlvl = chatmaxlvl if chatlvl > chatmaxlvl else chatlvl
+            gamelvl = gamemaxlvl if gamelvl > gamemaxlvl else chatlvl
+            chatrank = chatranks[chatlvl // 10 * 10]
+            gamerank = gameranks[gamelvl // 10 * 10]
             tip = f'"{user["tip"]}"' if user["tip"] else ''
             form = [
-                f'Твоя репутация - {user["reps"]} 🤝🏻 {user["likes"]} 💙',
-                f'У тебя на счету - {user["balance"]} 🌀',
+                f'Твоя репутация - {user["reps"]} 🤝🏻 {user["likes"]} ❤',
                 f'Твоё игровое имя - {user["playname"]}',
                 f'Твой ранг в чате - {chatrank}, {chatlvl} ур.',
                 f'А игровой ранг - {gamerank}, {gamelvl} ур.',
@@ -564,19 +542,18 @@ class Bot:
             form = '\n'.join(form)
             if flag:
                 return self.echo(
-                    f'👋🏻 {self.name}: {tip}\n{form}',
+                    f'👋🏻 {name}: {tip}\n{form}',
                     keyboard=keyboard(
                         [(f'🤝 @{screenname}', 'positive'), (f'❤ @{screenname}', 'positive')],
                         [('Имя сбросить', 'secondary'), ('Имя игровое сбросить', 'secondary')],
                     )
                 )
-            else:
-                return self.echo(
-                    f'👋🏻 {getUser(uid, key="name")}: {tip}\n{form}',
-                    keyboard=keyboard(
-                        [(f'🤝 @{screenname}', 'positive'), (f'❤ @{screenname}', 'positive')]
-                    )
+            return self.echo(
+                f'👋🏻 {name}: {tip}\n{form}',
+                keyboard=keyboard(
+                    [(f'🤝 @{screenname}', 'positive'), (f'❤ @{screenname}', 'positive')]
                 )
+            )
 
         elif cmd == 'магазин':
             self.echo('Скоро.')
@@ -586,24 +563,22 @@ class Bot:
 
         elif cmd == 'помощь':
             if argl:
-                if argl not in self.cmdsinfo.keys():
+                if argl not in cmds.keys():
                     return self.echo(f'{self.name}, такой команды нет в списке команд 😔\nЕсли ты хочешь узнать список команд, введи "помощь".')
-                return self.echo(self.cmdsinfo[argl])
-            else:
-                form = ', '.join(list(self.cmdsinfo.keys()))
-                return self.echo(
-                    f'{self.name}, это небольшое FAQ по использованию бота 👇\n\n',
-                    f'💭 Список команд - {form}.\nЧтобы узнать о команде подробнее, отправь "помощь" и название команды, например "помощь гиф".\n\n'
-                    '💭 Репутация - это ваши лайки и уважение. Чтобы лайкнуть или респектнуть человека, достаточно в его статусе нажать на соответствующую кнопку. Иногда бот сам определяет, когда уважаете или лайкайте человека, в зависимости от ответа на его сообщение.\n\n'
-                    '💭 Валюта, или же 🌀, называется азурами или азуриками. Их можно зарабатывать с помощью игр, а на них уже можно будет покупать токены в магазине.\n\n'
-                    '💭 Ранги - это именование вашего уровня. Всего доступно 50 уровней, из которых вы можете открыть 10 рангов. Каждый уровень в чате вам начисляется за 50 очков, 1 очко вы получаете за обычное сообщение, а 3 очка за обращение к боту (команда). Каждый уровень в играх вам начисляется за 10 очков, 5 очков за 1 победу.'
-                )
+                return self.echo(cmds[argl])
+            form = ', '.join(list(cmds.keys()))
+            return self.echo(
+                f'{self.name}, это небольшое FAQ по использованию бота 👇\n\n',
+                f'💭 Список команд - {form}.\nЧтобы узнать о команде подробнее, отправь "помощь" и название команды, например "помощь гиф".\n\n'
+                '💭 Репутация - это ваши лайки и уважение. Чтобы лайкнуть или респектнуть человека, достаточно в его статусе нажать на соответствующую кнопку. Иногда бот сам определяет, когда уважаете или лайкайте человека, в зависимости от ответа на его сообщение.\n\n'
+                '💭 Ранги - это именование вашего уровня. Всего доступно 200 уровней, из которых вы можете открыть 20 рангов. Каждый уровень в чате вам начисляется за 50 очков, 1 очко вы получаете за обычное сообщение, а 3 очка за обращение к боту (вам не будут начисляться очки за сообщения в лс бота). Каждый уровень в играх вам начисляется за 10 очков, 5 очков за 1 победу.'
+            )
 
         elif cmd == 'упоминание':
             if not args:
-                return self.echo(self.cmdsinfo['упоминание'])
+                return self.echo(cmds['упоминание'])
             if argl not in ['выкл', 'вкл']:
-                return self.echo(self.cmdsinfo[argl])
+                return self.echo(cmds[argl])
             if argl == 'выкл':
                 updateUser(self.id, 'mention', '=', 0)
                 return self.echo(f'✅ {self.name}, теперь я не буду @упоминать тебя в сообщениях.')
@@ -614,21 +589,19 @@ class Bot:
         elif cmd == 'число':
             if len(args) < 3:
                 if not args[1].isnumeric():
-                    return self.echo(f'✋ {self.name}, укажи число корректно.')
+                    return self.echo(f'{self.name}, укажи число корректно.')
                 en = int(args[1])
             if len(args) >= 3:
                 if not args[1].isnumeric() or not args[2].isnumeric():
-                    return self.echo(f'✋ {self.name}, укажи числа корректно.')
+                    return self.echo(f'{self.name}, укажи числа корректно.')
                 sn = int(args[1])
                 en = int(args[1])
             roll = randint(sn, en)
             return self.echo(f'🎲 {self.name}, рулетка выдала {roll}.')
         
-        repkeys = ['+', 'уважаю', 'увожаю', 'уважение', 'увожение', 'респект', '🤝🏻', 'справедливо', 'спроведливо', 'справебыдло', 'спровебыдло', 'F']
-        likekeys = list('❤💜💛💚💙🖤💕💟❣💘💝💖💗💓💞👍') + ['люблю', 'лав']
         for w in msg.lower().split():
             for i in repkeys:
-                if i in w.lower():
+                if i == w.lower():
                     if self.reply:
                         uid = self.reply['from_id']
                         if uid == self.id:
@@ -639,7 +612,7 @@ class Bot:
                         updateUser(uid, 'repsids', '+=', [self.id])
                         return self.echo(f'{formLink(uid, "+🤝")} от {self.name}.')
             for i in likekeys:
-                if i in w.lower():
+                if i == w.lower():
                     if self.reply:
                         uid = self.reply['from_id']
                         if uid == self.id:
@@ -653,12 +626,15 @@ class Bot:
         if DEBUG:
             admin(self.id, cmd, argl, args)
         
-        if cmd not in self.cmdsinfo.keys():
+        if cmd.lower() not in cmds.keys():
             words = openjson('words.json')
             for word in [i.lower() for i in msg.split()]:
                 if not [i for i in word if i in '[]|@/()<>$%&']:
                     words['words'].append(''.join([i for i in word if i not in '.,?.;:"']))
             rewritejson('words.json', words)
+        else:
+            if self.chat:
+                updateUser(event.obj['from_id'], 'chatscore', '+=', 2)
 
 
     def perform(self, msg):
@@ -696,23 +672,20 @@ class mainThread(VkBotLongPoll):
 
 for event in mainThread(bot_session, 187703257).listen():
     if event.type == VkBotEventType.MESSAGE_NEW:
-        e = event.obj
-        etext = e['text']
-        epeer = e['peer_id']
-        echat = None
-        if event.from_chat:
-            echat = int(event.chat_id)
-        efrom = e['from_id']
-        reply = None
-        if e['fwd_messages']:
-            reply = e['fwd_messages'][0]
-        else:
-            if 'reply_message' in e:
-                reply = e['reply_message']  
-        updateUser(efrom, 'chatscore', '+=', 1)
-        if efrom > 0:
-            if etext:
-                if DEBUG:
-                    sleep(etext, efrom)
-                bot = Bot(efrom, epeer, echat, reply)
-                Thread(target=bot.perform, args=(etext,)).start()
+        if event.obj['text']:
+            if event.from_chat:
+                updateUser(event.obj['from_id'], 'chatscore', '+=', 1)
+                chat = int(event.chat_id)
+            else:
+                chat = 0
+            if event.obj['fwd_messages']:
+                reply = event.obj['fwd_messages']
+            else:
+                if 'reply_message' in event.obj:
+                    reply = event.obj['reply_message']
+                else:
+                    reply = 0
+            if DEBUG:
+                sleep(event.obj['text'], event.obj['from_id'])
+            bot = Bot(event.obj['from_id'], event.obj['peer_id'], chat, reply)
+            Thread(target=bot.perform, args=(event.obj['text'],)).start()
